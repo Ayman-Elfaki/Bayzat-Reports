@@ -22,7 +22,7 @@ export default defineBackground({
       .pipe(bufferCount(1))
       .pipe(map(([{ tabId, url }]) => ({ tabId, url })))
       .pipe(filter((o) => !!o.url))
-      .pipe(connect(value => concat(value.pipe(take(1)), value.pipe(debounceTime(500)))))
+      .pipe(debounceTime(500))
       .subscribe(onPageUpdated);
 
     onMessage('getCompany', async ({ data: { companyId } }) => {
