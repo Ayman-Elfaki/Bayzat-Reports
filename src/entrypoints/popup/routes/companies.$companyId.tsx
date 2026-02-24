@@ -1,4 +1,3 @@
-import { sendMessage } from '@/services/messenger';
 import { Box, Button, Stack, Table, Title } from '@mantine/core';
 import { createFileRoute, Link } from '@tanstack/react-router'
 

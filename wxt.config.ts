@@ -6,7 +6,7 @@ export default defineConfig({
   manifest: {
     name: 'Bayzat Reports',
     description: 'Bayzat - Reports Generator',
-    permissions: ['tabs', 'webNavigation'],
+    permissions: ['tabs', 'webNavigation', 'offscreen','downloads'],
     web_accessible_resources: [{
       resources: ['fonts/Changa-Regular.ttf', 'images/bayzat.png', 'images/bayzat-report.svg'],
       matches: ['<all_urls>']

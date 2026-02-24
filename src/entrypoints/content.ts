@@ -1,9 +1,3 @@
-import { Ticket } from "@/components/Ticket";
-import { BayzatApi } from "@/services/api";
-import ReactPDF from '@react-pdf/renderer';
-import { onMessage, sendMessage } from "@/services/messenger";
-
-import { CompanyEntity, TicketTypeEntity } from "@/services/store";
 
 export default defineContentScript({
   matches: ['*://*.bayzat.com/*'],
@@ -14,7 +8,7 @@ export default defineContentScript({
     });
 
     onMessage('onPageUpdated', async ({ data: { url } }) => {
-      await handleCreatePrintButtons({ url });
+      await handleUpdateDomDownloadButtons({ url });
     });
 
   }
@@ -29,13 +23,7 @@ const handleGetUserProfile = async () => {
   return { token: user.token, companyId: user.companyId, employeeId: user.employeeId } as UserProfile;
 }
 
-const handleCreatePrintButtons = async ({ url }: { url: string | URL }) => {
-
-  const patterns = [
-    new MatchPattern('*://*.bayzat.com/enterprise/dashboard/employee-tickets/*'),
-  ];
-
-  if (patterns.every(u => !u.includes(url))) return;
+const handleUpdateDomDownloadButtons = async ({ url }: { url: string | URL }) => {
 
   const table = await queryForElement('table[data-external-id="table"]');
 
@@ -45,99 +33,36 @@ const handleCreatePrintButtons = async ({ url }: { url: string | URL }) => {
 
   const iconClass = menuButtons[0].querySelector('svg')?.classList.value;
 
-  menuButtons.filter(m => m instanceof HTMLButtonElement).forEach((menuButton, idx) => {
+  menuButtons.filter(m => m instanceof HTMLButtonElement).forEach((menuButton) => {
 
     const ticketId = menuButton.closest('tr')?.querySelectorAll('a[data-external-id="ticket-id"]')?.[0].textContent;
-    const printButton = menuButton.cloneNode(true) as HTMLButtonElement;
+    const downloadButton = menuButton.cloneNode(true) as HTMLButtonElement;
 
     if (!ticketId) return;
 
-    printButton.setAttribute('data-ticket-id', ticketId);
-    printButton.setAttribute('data-external-id', 'print');
+    downloadButton.setAttribute('data-ticket-id', ticketId);
+    downloadButton.setAttribute('data-external-id', 'print');
 
-    printButton.innerHTML = `
-       <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" class="${iconClass}">
-          <path fill="currentColor" d="M17 7.846H7v-3.23h10zm.616 4.27q.425 0 .712-.288t.288-.712t-.288-.713t-.712-.288t-.713.288t-.287.713t.287.712t.713.288M16 19v-4.538H8V19zm1 1H7v-4H3.577v-5.384q0-.85.577-1.425t1.423-.576h12.846q.85 0 1.425.576t.575 1.424V16H17z"/>
-        </svg>
+    downloadButton.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg"  width="30" height="30" fill="none" viewBox="0 0 24 24" stroke="currentColor" class="${iconClass}">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+      </svg>
     `;
 
-    printButton.addEventListener('click', async () => {
+    downloadButton.addEventListener('click', async () => {
 
-      printButton.setAttribute('disabled', 'true');
-      printButton.classList.add('Mui-disabled');
+      downloadButton.setAttribute('disabled', 'true');
+      downloadButton.classList.add('Mui-disabled');
 
-      const user = await handleGetUserProfile();
-      if (!user) return;
+      await sendMessage('generatePdfDocument', { ticketId });
 
-      const ticket = await BayzatApi.getTicket(ticketId, user.companyId, user.token);
-      const company = await sendMessage('getCompany', { companyId: user.companyId });
-
-      if (!ticket || !company) return;
-
-      const ticketType = await sendMessage('getTicketType', { ticketId: ticket.ticket_type_id, companyId: user.companyId });
-
-      if (!ticketType) return;
-
-      await handlePrint({ ticket, company, ticketType })
-
-      printButton.removeAttribute('disabled');
-      printButton.classList.remove('Mui-disabled');
+      downloadButton.removeAttribute('disabled');
+      downloadButton.classList.remove('Mui-disabled');
 
     });
 
-    menuButton.parentElement?.prepend(printButton);
+    menuButton.parentElement?.prepend(downloadButton);
 
   });
 
 }
-
-
-
-export const handlePrint = async ({ ticket, company, ticketType }: { ticket: TicketResponse, company: CompanyEntity, ticketType: TicketTypeEntity }) => {
-
-  const pdfDocument = ReactPDF.pdf(Ticket({ ticket, company, ticketType }));
-
-  let blobURL: string | null = null;
-
-  try {
-
-    ticket.attachments.forEach(async attachment => {
-
-      if (attachment.source) {
-        const response = await fetch(attachment.source, { method: 'GET' });
-        const blob = await response.blob();
-        attachment.source = URL.createObjectURL(blob);
-      }
-
-    });
-
-    const blob = await pdfDocument.toBlob();
-    blobURL = URL.createObjectURL(blob);
-
-    const iframe = document.createElement('iframe');
-    document.body.appendChild(iframe);
-    iframe.style.display = 'none';
-    iframe.src = blobURL;
-    iframe.onload = () => {
-      setTimeout(() => {
-        iframe.focus();
-        iframe.contentWindow?.print();
-      }, 1);
-    };
-
-  }
-  catch (e) {
-    window.location.reload();
-  }
-  finally {
-
-    if (blobURL) URL.revokeObjectURL(blobURL);
-
-    ticket.attachments.forEach(attachment => {
-      if (attachment.source) URL.revokeObjectURL(attachment.source);
-    });
-
-  }
-
-}
-

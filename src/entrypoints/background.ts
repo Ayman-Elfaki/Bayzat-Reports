@@ -1,9 +1,8 @@
-import { OptionsRepository, CompanyEntity, TicketTypeEntity } from "@/services/store";
-import { onMessage, sendMessage } from "@/services/messenger";
+import { CompanyEntity, TicketTypeEntity } from "@/utils/store";
 import { fromEventPattern, debounceTime, filter, map, connect, concat, bufferCount, take } from 'rxjs';
-import { BayzatApi } from "@/services/api";
 
 type OnUpdatedArgs = Parameters<Parameters<typeof browser.tabs.onUpdated.addListener>[number]>;
+
 type WebNavigationArgs = Parameters<Parameters<typeof browser.webNavigation.onCompleted.addListener>[0]>[0];
 
 export default defineBackground({
@@ -22,7 +21,7 @@ export default defineBackground({
       .pipe(bufferCount(1))
       .pipe(map(([{ tabId, url }]) => ({ tabId, url })))
       .pipe(filter((o) => !!o.url))
-      .pipe(debounceTime(500))
+      .pipe(debounceTime(300))
       .subscribe(onPageUpdated);
 
     onMessage('getCompany', async ({ data: { companyId } }) => {
@@ -45,6 +44,10 @@ export default defineBackground({
       return await optionsRepository.listTicketTypes(companyId);
     });
 
+    onMessage('generatePdfDocument', async ({ data: { ticketId } }) => {
+      await generatePdfDocument({ ticketId });
+    });
+
   },
 });
 
@@ -58,12 +61,11 @@ const onPageUpdated = async ({ tabId, url }: { tabId: number, url: string }) => 
   ];
 
   if (patterns.every(u => !u.includes(url))) return;
-  
+
   await onInitOptions({ tabId });
 
   await sendMessage('onPageUpdated', { url }, tabId);
 }
-
 
 
 const onInitOptions = async ({ tabId }: { tabId: number }) => {
@@ -102,4 +104,49 @@ const onInitOptions = async ({ tabId }: { tabId: number }) => {
 
     optionsRepository.init(companies, ticketTypes);
   }
+}
+
+
+export const generatePdfDocument = async ({ ticketId }: { ticketId: string }) => {
+
+  const optionsRepository = new OptionsRepository();
+
+  const tabs = (await browser.tabs.query({ active: true, currentWindow: true })).filter(t => t);
+
+  if (tabs.length === 0) return;
+
+  const user = await sendMessage('getUser', undefined, tabs[0].id);
+
+  if (!user) return;
+
+  const ticket = await BayzatApi.getTicket(ticketId, user.companyId, user.token);
+
+  const company = await optionsRepository.getCompany(user.companyId);
+
+  if (!ticket || !company) return;
+
+  const ticketType = await optionsRepository.getTicketType(ticket.ticket_type_id, user.companyId);
+
+  if (!ticketType) return;
+
+  const offscreenUrl = browser.runtime.getURL('/offscreen.html');
+
+  const existing = await browser.offscreen.hasDocument();
+
+  if (existing) return;
+
+  await browser.offscreen.createDocument({ url: offscreenUrl, reasons: ['BLOBS'], justification: 'Create blob URL for download' });
+
+  const link = await sendMessage('getPdfDocumentLink', { ticket, company, ticketType });
+
+
+  if (link) {
+    browser.downloads.download({
+      url: link,
+      filename: `Bayzats/Ticket-${ticketId}.pdf`,
+      saveAs: true
+    });
+  }
+
+  await browser.offscreen.closeDocument();
 }

@@ -1,4 +1,4 @@
-import { CompanyEntity, TicketTypeEntity } from '@/services/store';
+import { CompanyEntity, TicketTypeEntity } from '@/utils/store';
 import { Page, Text, Image, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
 
 
@@ -100,13 +100,13 @@ const styles = StyleSheet.create({
 });
 
 
-type PropsType = {
+export type TicketPropsType = {
     ticket: TicketResponse,
     company: CompanyEntity,
     ticketType: TicketTypeEntity,
 }
 
-const HeaderView = ({ company }: PropsType) => {
+const HeaderView = ({ company }: TicketPropsType) => {
     return (
         <View style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', borderBottom: '1px', borderBottomColor: '#303234' }}>
             {company.logo ?
@@ -122,7 +122,7 @@ const FooterView = () => (
     </View>
 )
 
-const TitleView = ({ ticket }: { ticket: PropsType['ticket'] }) => {
+const TitleView = ({ ticket }: { ticket: TicketPropsType['ticket'] }) => {
     const isPending = ticket.approval_status.trim().toLowerCase() === 'pending'
     return (
         <View style={styles.header}>
@@ -138,7 +138,7 @@ const TitleView = ({ ticket }: { ticket: PropsType['ticket'] }) => {
     )
 }
 
-const MainView = ({ ticket }: { ticket: PropsType['ticket'] }) => {
+const MainView = ({ ticket }: { ticket: TicketPropsType['ticket'] }) => {
     const requestedBy = `${ticket.creator.first_name} ${ticket.creator.last_name}`;
     const lineManager = `${ticket.line_manager.first_name} ${ticket.line_manager.last_name}`;
     const employee = `${ticket.employee.first_name} ${ticket.employee.last_name}`;
@@ -167,7 +167,7 @@ const MainView = ({ ticket }: { ticket: PropsType['ticket'] }) => {
     )
 }
 
-const ApproversView = ({ ticket }: { ticket: PropsType['ticket'] }) => {
+const ApproversView = ({ ticket }: { ticket: TicketPropsType['ticket'] }) => {
     const approvers = [...new Set(ticket.approvers
         .filter(p => p.status === 'accepted' && 'employee_full_name' in p)
         .map(p => 'employee_full_name' in p ? p['employee_full_name'] as string : null)
@@ -195,7 +195,7 @@ const ApproversView = ({ ticket }: { ticket: PropsType['ticket'] }) => {
     )
 }
 
-const StyledView = ({ ticket, ticketType }: PropsType) => {
+const StyledView = ({ ticket, ticketType }: TicketPropsType) => {
 
     const properties = ticketType.properties
         .filter(p => p.enabled && p.highlighted)
@@ -219,7 +219,7 @@ const StyledView = ({ ticket, ticketType }: PropsType) => {
     )
 }
 
-const UnstyledView = ({ ticket, ticketType }: PropsType) => {
+const UnstyledView = ({ ticket, ticketType }: TicketPropsType) => {
 
     const properties = ticketType.properties
         .filter(p => p.enabled && !p.highlighted)
@@ -243,34 +243,35 @@ const UnstyledView = ({ ticket, ticketType }: PropsType) => {
     )
 }
 
-const AttachmentsPagesView = ({ ticket, company, ticketType }: PropsType) => {
+const AttachmentsPagesView = ({ ticket, company, ticketType }: TicketPropsType) => {
     const supportedMimeTypes = ["image/png", "image/jpeg", "image/jpg"];
     const filteredAttachments = ticket.attachments.filter(a => supportedMimeTypes.includes(a.mime_type));
 
-    return (
-        filteredAttachments.length > 0 ?
-            (<Page size="A4" orientation='landscape' style={styles.page}>
-                {filteredAttachments.map((attachment, index) => (
-                    <View style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }} key={index}>
-                        <View fixed>
-                            <HeaderView ticket={ticket} company={company} ticketType={ticketType} />
-                        </View>
-                        <View style={{ flexGrow: 1, padding: '20px' }}>
-                            <View style={{ display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
-                                <Text style={{ fontSize: '18px', fontWeight: 'bold', textTransform: 'uppercase' }}>{attachment.name}</Text>
-                                <Image src={attachment.source} style={{ width: '90%' }} />
-                            </View>
-                        </View>
-                        <View fixed>
-                            <FooterView />
+    const hasAttachment = filteredAttachments.length > 0;
+
+    return (hasAttachment ?
+        (<Page size="A4" orientation='landscape' style={styles.page}>
+            {filteredAttachments.map((attachment, index) => (
+                <View style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw' }} key={index}>
+                    <View fixed>
+                        <HeaderView ticket={ticket} company={company} ticketType={ticketType} />
+                    </View>
+                    <View style={{ flexGrow: 1, padding: '20px' }}>
+                        <View style={{ display: 'flex', flexDirection: 'column', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
+                            <Text style={{ fontSize: '18px', fontWeight: 'bold', textTransform: 'uppercase' }}>{attachment.name}</Text>
+                            <Image src={attachment.source} style={{ width: '90%' }} />
                         </View>
                     </View>
-                ))}
-            </Page>) : (<View></View>)
+                    <View fixed>
+                        <FooterView />
+                    </View>
+                </View>
+            ))}
+        </Page>) : (<View></View>)
     )
 }
 
-export const Ticket = ({ ticket, company, ticketType }: PropsType) => {
+export const Ticket: React.FC<TicketPropsType> = ({ ticket, company, ticketType }) => {
     return (
         <Document>
             <Page size="A4" style={styles.page}>
