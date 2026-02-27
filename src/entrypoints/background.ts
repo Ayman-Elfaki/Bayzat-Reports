@@ -111,7 +111,9 @@ export const generatePdfDocument = async ({ ticketId }: { ticketId: string }) =>
 
   const optionsRepository = new OptionsRepository();
 
-  const tabs = (await browser.tabs.query({ active: true, currentWindow: true })).filter(t => t);
+  const window = await browser.windows.getCurrent({ populate: true });
+
+  const tabs = await browser.tabs.query({ active: true, windowId: window.id });
 
   if (tabs.length === 0) return;
 
