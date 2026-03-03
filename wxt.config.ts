@@ -6,7 +6,10 @@ export default defineConfig({
   manifest: {
     name: 'Bayzat Reports',
     description: 'Bayzat - Reports Generator',
-    permissions: ['tabs', 'webNavigation', 'offscreen','downloads'],
+    permissions: ['tabs', 'webNavigation', 'offscreen', 'downloads'],
+    content_security_policy: {
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; default-src 'self';object-src 'self'; connect-src 'self' data: https://api.bayzat.com;"
+    },
     web_accessible_resources: [{
       resources: ['fonts/Changa-Regular.ttf', 'images/bayzat.png', 'images/bayzat-report.svg'],
       matches: ['<all_urls>']
