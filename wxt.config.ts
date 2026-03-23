@@ -8,7 +8,7 @@ export default defineConfig({
     description: 'Bayzat - Reports Generator',
     permissions: ['tabs', 'webNavigation', 'offscreen', 'downloads'],
     content_security_policy: {
-      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; default-src 'self';object-src 'self'; connect-src 'self' data: https://api.bayzat.com;"
+      extension_pages: "script-src 'self' 'wasm-unsafe-eval'; default-src 'self';object-src 'self'; connect-src 'self' data: https://api.bayzat.com https://cdn.bayzat.com;",
     },
     web_accessible_resources: [{
       resources: ['fonts/Changa-Regular.ttf', 'images/bayzat.png', 'images/bayzat-report.svg'],
